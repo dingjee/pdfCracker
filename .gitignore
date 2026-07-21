@@ -1,0 +1,36 @@
+# Local credentials and overrides
+.env
+.env.*
+!.env.example
+
+# Python environments, caches, coverage, and build products
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local document inputs. Source documents never enter version control.
+puzzle/
+inputs/
+*.pdf
+
+# Per-document runs and generated extraction/publication artifacts
+runs/
+output/
+outputs/
+artifacts/
+tmp/
+*.epub
+*.docx
+
+# Generated research evidence and document-derived gold data
+research/benchmarks/
+research/evidence/
+research/gold/
