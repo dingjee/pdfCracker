@@ -127,8 +127,44 @@ class MergeDecision(BaseModel):
     reasons: list[str] = Field(default_factory=list)
 
 
+class EmbeddedImage(BaseModel):
+    id: str
+    page: int
+    object_name: str
+    asset_path: str
+    sha256: str
+    bbox: BBox
+    bbox_norm: BBox
+    pixel_width: int
+    pixel_height: int
+    format: str
+    role: Literal["content", "decorative", "review"] = "review"
+    include_in_markdown: bool = False
+    confidence: float = 0.0
+    evidence: list[str] = Field(default_factory=list)
+    caption_block_id: str | None = None
+    caption_text: str | None = None
+    anchor_before_block_id: str | None = None
+    anchor_after_block_id: str | None = None
+
+
+class NativeTable(BaseModel):
+    id: str
+    page: int
+    bbox: BBox
+    bbox_norm: BBox
+    raw_rows: list[list[str]] = Field(default_factory=list)
+    rows: list[list[str]] = Field(default_factory=list)
+    source_column_count: int
+    role: Literal["table", "layout", "review"] = "review"
+    include_in_markdown: bool = False
+    confidence: float = 0.0
+    evidence: list[str] = Field(default_factory=list)
+    anchor_before_block_id: str | None = None
+
+
 class Document(BaseModel):
-    schema_version: str = "0.1.0"
+    schema_version: str = "0.2.0"
     source_path: str
     source_sha256: str
     source_page_count: int
@@ -136,4 +172,6 @@ class Document(BaseModel):
     pages: list[Page]
     body_font_size: float
     merges: list[MergeDecision] = Field(default_factory=list)
+    images: list[EmbeddedImage] = Field(default_factory=list)
+    tables: list[NativeTable] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)

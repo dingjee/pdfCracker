@@ -41,3 +41,48 @@ Inspect native style evidence without vision:
 ```powershell
 uv run pdfcracker style-probe "puzzle/book.pdf" --pages 3,15 --output "runs/book/qa/styles.json"
 ```
+
+Run the staged workflow on a bounded pilot:
+
+```powershell
+uv run pdfcracker process "puzzle/book.pdf" `
+  --pages 3-20,37-38 `
+  --output "runs/book/pilot-v2" `
+  --keep-review-renders
+```
+
+Apply reviewed, document-specific decisions without promoting them into the
+reusable core:
+
+```powershell
+uv run pdfcracker process "puzzle/book.pdf" `
+  --output "runs/book/full-v2" `
+  --profile "runs/book/profile-v1.json"
+```
+
+Use `--keep-cache` during iterative calibration when another run is expected.
+Final successful runs clean the content-addressed cache by default.
+
+Omit `--pages` for full-document coverage. `process` writes to a hidden staging
+directory, extracts embedded PDF image objects, builds a risk-page plan, runs the
+graded audit, and promotes the result only when no fundamental integrity error is
+present. Successful runs remove their content-addressed raw-parser cache.
+
+The current image scope is deliberately narrow: PDFCracker extracts only embedded
+image objects. It does not rasterize whole pages or arbitrary regions as a fallback.
+Every decoded object is retained in the manifest; only evidence-backed content images
+are inserted into Markdown. Decorations and ambiguous objects remain auditable.
+
+Re-run an audit from saved artifacts:
+
+```powershell
+uv run pdfcracker audit "runs/book/full/document.json" `
+  "runs/book/full/book.md" `
+  --artifact-root "runs/book/full" `
+  --output "runs/book/full/qa/audit.json" `
+  --require-full
+```
+
+Audit levels are `fatal`, `needs_review`, `warning`, and `information`. Only
+fundamental integrity failures block publication; ordinary fidelity uncertainty is
+reported for targeted review.

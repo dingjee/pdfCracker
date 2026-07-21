@@ -67,6 +67,14 @@ def test_mixed_font_block_splits_heading_from_body(sample_document) -> None:
     assert any(block.text.startswith("The difference between") for block in page.blocks)
 
 
+def test_stacked_chapter_opening_headings_form_a_hierarchy(sample_document) -> None:
+    page = next(page for page in sample_document.pages if page.number == 6)
+    headings = [
+        block for block in page.blocks if block.type == BlockType.HEADING and not block.removed_as
+    ]
+    assert [block.heading_level for block in headings[:3]] == [1, 2, 3]
+
+
 def test_native_style_evidence_preserves_underline_and_synthetic_bold(sample_document) -> None:
     page = next(page for page in sample_document.pages if page.number == 7)
     underlined = "".join(

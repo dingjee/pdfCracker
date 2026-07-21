@@ -8,8 +8,12 @@ from pathlib import Path
 import pypdfium2 as pdfium
 
 from pdfcracker.diagnostics import probe_styles
+from pdfcracker.audit import audit_document
 from pdfcracker.extract import extract_document, parse_page_spec
 from pdfcracker.markdown import render_markdown
+from pdfcracker.models import Document
+from pdfcracker.pipeline import process_pdf
+from pdfcracker.profile import DocumentProfile
 from pdfcracker.render import render_pages
 from pdfcracker.vision import run_benchmark
 
@@ -31,6 +35,29 @@ def _build_parser() -> argparse.ArgumentParser:
     extract_parser.add_argument("--pages", help="1-based pages, e.g. 3-20,37-38")
     extract_parser.add_argument("--output", type=Path, required=True)
     extract_parser.add_argument("--title")
+    extract_parser.add_argument("--cache-dir", type=Path)
+
+    process_parser = subparsers.add_parser(
+        "process", help="Run extraction, embedded-image handling, risk planning, and audit"
+    )
+    process_parser.add_argument("pdf", type=Path)
+    process_parser.add_argument("--pages", help="1-based pages; omit for the full document")
+    process_parser.add_argument("--output", type=Path, required=True)
+    process_parser.add_argument("--title")
+    process_parser.add_argument("--cache-dir", type=Path)
+    process_parser.add_argument("--profile", type=Path)
+    process_parser.add_argument("--keep-cache", action="store_true")
+    process_parser.add_argument("--keep-review-renders", action="store_true")
+    process_parser.add_argument("--visual-sample-limit", type=int, default=32)
+
+    audit_parser = subparsers.add_parser(
+        "audit", help="Audit a document sidecar, Markdown, and extracted assets"
+    )
+    audit_parser.add_argument("document", type=Path)
+    audit_parser.add_argument("markdown", type=Path)
+    audit_parser.add_argument("--artifact-root", type=Path, required=True)
+    audit_parser.add_argument("--output", type=Path, required=True)
+    audit_parser.add_argument("--require-full", action="store_true")
 
     render_parser = subparsers.add_parser("render", help="Render selected pages to PNG")
     render_parser.add_argument("pdf", type=Path)
@@ -60,7 +87,7 @@ def _run_extract(args: argparse.Namespace) -> int:
     page_count = _page_count(args.pdf)
     pages = parse_page_spec(args.pages, page_count)
     args.output.mkdir(parents=True, exist_ok=True)
-    document = extract_document(args.pdf, pages)
+    document = extract_document(args.pdf, pages, cache_dir=args.cache_dir)
     (args.output / "document.json").write_text(
         document.model_dump_json(indent=2), encoding="utf-8"
     )
@@ -136,6 +163,45 @@ def _run_render(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_process(args: argparse.Namespace) -> int:
+    page_count = _page_count(args.pdf)
+    pages = parse_page_spec(args.pages, page_count)
+    profile = (
+        DocumentProfile.model_validate_json(args.profile.read_text(encoding="utf-8"))
+        if args.profile
+        else None
+    )
+    result = process_pdf(
+        args.pdf,
+        args.output,
+        pages=pages,
+        title=args.title,
+        cache_dir=args.cache_dir,
+        require_full=args.pages is None,
+        keep_review_renders=args.keep_review_renders,
+        visual_sample_limit=args.visual_sample_limit,
+        cleanup_cache_on_success=not args.keep_cache,
+        profile=profile,
+    )
+    print(result.model_dump_json(indent=2))
+    return 0 if result.published else 2
+
+
+def _run_audit(args: argparse.Namespace) -> int:
+    document = Document.model_validate_json(args.document.read_text(encoding="utf-8"))
+    markdown = args.markdown.read_text(encoding="utf-8")
+    report = audit_document(
+        document,
+        markdown,
+        args.artifact_root,
+        require_full=args.require_full,
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
+    print(report.model_dump_json(indent=2))
+    return 0 if report.publishable else 2
+
+
 def _run_vision_benchmark(args: argparse.Namespace) -> int:
     gold = json.loads(args.gold.read_text(encoding="utf-8")) if args.gold else None
     rows = run_benchmark(args.images, args.model, args.output, gold)
@@ -172,13 +238,17 @@ def main() -> None:
     try:
         if args.command == "extract":
             raise SystemExit(_run_extract(args))
+        if args.command == "process":
+            raise SystemExit(_run_process(args))
+        if args.command == "audit":
+            raise SystemExit(_run_audit(args))
         if args.command == "render":
             raise SystemExit(_run_render(args))
         if args.command == "vision-benchmark":
             raise SystemExit(_run_vision_benchmark(args))
         if args.command == "style-probe":
             raise SystemExit(_run_style_probe(args))
-    except (FileNotFoundError, ValueError) as error:
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
         parser.error(str(error))
     raise SystemExit(2)
 

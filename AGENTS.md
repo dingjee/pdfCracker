@@ -11,6 +11,8 @@ The primary intermediate outputs are a provenance-rich `document.json` and a sim
 - Prefer deterministic PDF objects, geometry, fonts, colors, vector lines, statistics, and tested code over OCR or vision-model judgment.
 - Use OCR only when the native text layer is absent, corrupt, duplicated, or demonstrably worse.
 - Use vision models for unresolved layout ambiguity, parser disagreement, and visual verification. Do not use them to transcribe an entire clean text-layer PDF.
+- Extract only image objects embedded in the PDF. Do not rasterize pages or regions as an image-extraction fallback; flag scanned or inseparable page imagery as deferred scope.
+- Treat embedded image extraction and semantic insertion separately: preserve objects in the manifest, but insert only content images with evidence-backed anchors; route decoration/content ambiguity to review.
 - Preserve provenance for every deletion, style transformation, paragraph join, and cross-page merge.
 - Model inline semantics as orthogonal flags (bold, italic, underline, semantic color, links, and roles); never flatten nested combinations. Preserve meaning in Markdown/HTML and defer exact appearance to EPUB CSS.
 - Treat accidental body-text deletion and incorrect cross-page merges as release-blocking defects.

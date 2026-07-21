@@ -3,7 +3,15 @@ from __future__ import annotations
 import html
 import re
 
-from pdfcracker.models import Block, BlockType, Document, FontInfo, Span
+from pdfcracker.models import (
+    Block,
+    BlockType,
+    Document,
+    EmbeddedImage,
+    FontInfo,
+    NativeTable,
+    Span,
+)
 
 
 def _is_bold(font: FontInfo) -> bool:
@@ -124,6 +132,42 @@ def _plain_markdown_text(text: str) -> str:
     return text.replace("\\", "\\\\").replace("*", "\\*").replace("_", "\\_").strip()
 
 
+def _render_image(image: EmbeddedImage, debug: bool) -> list[str]:
+    alt = image.caption_text or "Embedded image"
+    alt = alt.replace("[", "\\[").replace("]", "\\]").replace("\n", " ")
+    output: list[str] = []
+    if debug:
+        output.append(
+            f"<!-- image:{image.id} page:{image.page} role:{image.role} "
+            f"confidence:{image.confidence:.3f} -->"
+        )
+    output.extend([f"![{alt}]({image.asset_path})", ""])
+    return output
+
+
+def _table_cell(text: str) -> str:
+    value = html.escape(text).replace("|", "&#124;").replace("\n", "<br>").strip()
+    return value or "&nbsp;"
+
+
+def _render_table(table: NativeTable, debug: bool) -> list[str]:
+    if not table.rows:
+        return []
+    rows = [[_table_cell(cell) for cell in row] for row in table.rows]
+    width = max(len(row) for row in rows)
+    rows = [row + ["&nbsp;"] * (width - len(row)) for row in rows]
+    output: list[str] = []
+    if debug:
+        output.append(
+            f"<!-- table:{table.id} page:{table.page} confidence:{table.confidence:.3f} -->"
+        )
+    output.append("| " + " | ".join(rows[0]) + " |")
+    output.append("| " + " | ".join("---" for _ in range(width)) + " |")
+    output.extend("| " + " | ".join(row) + " |" for row in rows[1:])
+    output.append("")
+    return output
+
+
 def render_markdown(document: Document, title: str | None = None, debug: bool = False) -> str:
     merge_targets = {
         decision.to_block: decision
@@ -138,7 +182,47 @@ def render_markdown(document: Document, title: str | None = None, debug: bool = 
     for page in document.pages:
         if debug:
             output.append(f"<!-- page:{page.number} kind:{page.kind.value} -->")
+        page_images = [image for image in document.images if image.page == page.number]
+        page_tables = [table for table in document.tables if table.page == page.number]
+        before: dict[str, list[EmbeddedImage]] = {}
+        after: dict[str, list[EmbeddedImage]] = {}
+        unanchored: list[EmbeddedImage] = []
+        for image in page_images:
+            if not image.include_in_markdown:
+                if debug:
+                    output.append(
+                        f"<!-- skipped-image:{image.id} role:{image.role} "
+                        f"asset:{image.asset_path} -->"
+                    )
+                continue
+            if image.anchor_before_block_id:
+                before.setdefault(image.anchor_before_block_id, []).append(image)
+            elif image.anchor_after_block_id:
+                after.setdefault(image.anchor_after_block_id, []).append(image)
+            else:
+                unanchored.append(image)
+        for image in unanchored:
+            output.extend(_render_image(image, debug))
+        tables_before: dict[str, list[NativeTable]] = {}
+        unanchored_tables: list[NativeTable] = []
+        for table in page_tables:
+            if not table.include_in_markdown:
+                if debug:
+                    output.append(
+                        f"<!-- skipped-table:{table.id} role:{table.role} -->"
+                    )
+                continue
+            if table.anchor_before_block_id:
+                tables_before.setdefault(table.anchor_before_block_id, []).append(table)
+            else:
+                unanchored_tables.append(table)
+        for table in unanchored_tables:
+            output.extend(_render_table(table, debug))
         for block in page.blocks:
+            for image in before.get(block.id, []):
+                output.extend(_render_image(image, debug))
+            for table in tables_before.get(block.id, []):
+                output.extend(_render_table(table, debug))
             if block.removed_as:
                 if debug:
                     output.append(
@@ -160,6 +244,8 @@ def render_markdown(document: Document, title: str | None = None, debug: bool = 
                     if output[index] and not output[index].startswith("<!--"):
                         output[index] = output[index].rstrip() + " " + text.lstrip()
                         break
+                for image in after.get(block.id, []):
+                    output.extend(_render_image(image, debug))
                 continue
             if block.type == BlockType.HEADING:
                 heading_key = re.sub(r"\W+", "", block.text.casefold())
@@ -180,11 +266,15 @@ def render_markdown(document: Document, title: str | None = None, debug: bool = 
                         output.extend([f"> {line_text}", ""])
             elif block.type == BlockType.QUOTE:
                 output.extend([f"> {text}", ""])
+            elif block.type == BlockType.CAPTION:
+                output.extend([f"*{text}*", ""])
             elif block.type == BlockType.LIST_ITEM:
                 clean = re.sub(r"^(?:[•●▪◦*-]|\(?\d+[.)]|[A-Za-z][.)])\s+", "", text)
                 output.extend([f"- {clean}", ""])
             else:
                 output.extend([text, ""])
+            for image in after.get(block.id, []):
+                output.extend(_render_image(image, debug))
 
     while output and not output[-1]:
         output.pop()

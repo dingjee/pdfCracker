@@ -7,8 +7,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
-from pdftext.extraction import dictionary_output
-
+from pdfcracker.cache import load_pdftext_pages
 from pdfcracker.models import (
     BBox,
     Block,
@@ -343,6 +342,33 @@ def classify_blocks(pages: list[Page], body_font_size: float) -> None:
                 block.evidence.extend(["margin_band", f"repeated_on_{repeated_pages}_pages"])
 
 
+def normalize_stacked_heading_levels(pages: list[Page]) -> None:
+    """Use descending font-size ranks for heading stacks before the first body block."""
+    for page in pages:
+        ordered = sorted(page.blocks, key=lambda block: (block.bbox.y0, block.bbox.x0))
+        stack: list[Block] = []
+        for block in ordered:
+            if block.removed_as:
+                continue
+            if block.type == BlockType.HEADING and block.bbox_norm.y0 <= 0.35:
+                stack.append(block)
+                continue
+            if block.type in {
+                BlockType.PARAGRAPH,
+                BlockType.LIST_ITEM,
+                BlockType.QUOTE,
+            }:
+                break
+        if len(stack) < 2:
+            continue
+        sizes = [_block_font_size(block) for block in stack]
+        if any(following >= previous - 1.0 for previous, following in zip(sizes, sizes[1:], strict=False)):
+            continue
+        for rank, block in enumerate(stack, start=1):
+            block.heading_level = min(rank, 6)
+            block.evidence.append(f"stacked_heading_rank={rank}")
+
+
 def score_cross_page_merge(previous: Block, following: Block, pages: dict[int, Page]) -> MergeDecision:
     reasons: list[str] = []
     score = 0.0
@@ -444,14 +470,20 @@ def find_merges(pages: list[Page], selected_pages: set[int]) -> list[MergeDecisi
     return decisions
 
 
-def extract_document(pdf_path: Path, selected_pages: list[int] | None = None) -> Document:
-    raw_pages = dictionary_output(str(pdf_path), sort=True, keep_chars=False)
+def extract_document(
+    pdf_path: Path,
+    selected_pages: list[int] | None = None,
+    cache_dir: Path | None = None,
+) -> Document:
+    source_sha256 = sha256_file(pdf_path)
+    raw_pages, cache_metadata = load_pdftext_pages(pdf_path, source_sha256, cache_dir)
     pages = [_convert_page(raw_page) for raw_page in raw_pages]
     page_count = len(pages)
     selected_pages = selected_pages or list(range(1, page_count + 1))
     body_font_size = _body_font_size(pages)
     split_mixed_blocks(pages, body_font_size)
     classify_blocks(pages, body_font_size)
+    normalize_stacked_heading_levels(pages)
     assign_toc_line_metadata(pages)
     selected = set(selected_pages)
     kept_pages = [page for page in pages if page.number in selected]
@@ -460,11 +492,14 @@ def extract_document(pdf_path: Path, selected_pages: list[int] | None = None) ->
     block_counts = Counter(block.type.value for page in kept_pages for block in page.blocks)
     return Document(
         source_path=str(pdf_path.resolve()),
-        source_sha256=sha256_file(pdf_path),
+        source_sha256=source_sha256,
         source_page_count=page_count,
         selected_pages=selected_pages,
         pages=kept_pages,
         body_font_size=body_font_size,
         merges=merges,
-        metadata={"block_counts": dict(sorted(block_counts.items()))},
+        metadata={
+            "block_counts": dict(sorted(block_counts.items())),
+            "cache": cache_metadata,
+        },
     )
