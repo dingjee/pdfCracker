@@ -8,8 +8,8 @@ a bounded pilot for human review before full-book processing.
 
 ```powershell
 uv sync --locked
-uv run pytest
-uv run ruff check .
+uv run python -m pytest
+uv run python -m ruff check .
 ```
 
 ## Repository boundary
@@ -86,3 +86,32 @@ uv run pdfcracker audit "runs/book/full/document.json" `
 Audit levels are `fatal`, `needs_review`, `warning`, and `information`. Only
 fundamental integrity failures block publication; ordinary fidelity uncertainty is
 reported for targeted review.
+
+Package accepted Markdown with its image files (no `document.json` required):
+
+```powershell
+uv run pdfcracker package "runs/book/full/book.md" `
+  --artifact-root "runs/book/full" `
+  --output "runs/book/delivery" `
+  --self-contained
+```
+
+The ZIP preserves paths relative to `--artifact-root`, so Markdown in a nested
+directory can still reference sibling assets. It includes a browser reading
+version of the first Markdown input. `--self-contained` also writes one HTML
+file with original image bytes embedded. Multiple Markdown inputs and repeated
+`--include path/to/file.txt` options can share one package. The output directory
+must be new. All references, image decoding, archive CRC, and embedded image hashes
+are checked before the delivery directory is published. Images must be local,
+inside the declared root, and browser compatible for HTML delivery.
+
+Audits check the delivered Markdown, including body text, materialized table
+cells, empty/missing image destinations, and asset hashes. CLI image references
+resolve from the supplied Markdown file's directory rather than the sidecar's
+directory. These checks detect missing content; they do not prove reading order
+or cross-page merge precision.
+
+See [extraction and delivery lessons](knowledge/workflows/native-extraction-and-delivery.md)
+for the acceptance method, common false passes, and retention policy. Local golden
+tests select their named regression PDF in `puzzle/` or `puzzle/achieved/`; adding
+another PDF must not silently change the regression source.

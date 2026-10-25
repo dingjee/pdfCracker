@@ -10,7 +10,13 @@ from pdfcracker.markdown import render_markdown
 from pdfcracker.models import BlockType
 
 
-SAMPLE_PDF = next((Path(__file__).parents[1] / "puzzle").glob("*.pdf"), None)
+SAMPLE_NAME = "Breaking Comedy's DNA_v1.4.4-[US]Jerry Corley.pdf"
+SAMPLE_ROOT = Path(__file__).parents[1] / "puzzle"
+SAMPLE_PDF = next(
+    (path for path in (SAMPLE_ROOT / SAMPLE_NAME, SAMPLE_ROOT / "achieved" / SAMPLE_NAME)
+     if path.is_file()),
+    None,
+)
 
 
 def test_parse_page_spec() -> None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 import html
 import re
 
+from pdfcracker.markdown_content import list_item_text
+
 from pdfcracker.models import (
     Block,
     BlockType,
@@ -269,7 +271,7 @@ def render_markdown(document: Document, title: str | None = None, debug: bool = 
             elif block.type == BlockType.CAPTION:
                 output.extend([f"*{text}*", ""])
             elif block.type == BlockType.LIST_ITEM:
-                clean = re.sub(r"^(?:[•●▪◦*-]|\(?\d+[.)]|[A-Za-z][.)])\s+", "", text)
+                clean = list_item_text(text)
                 output.extend([f"- {clean}", ""])
             else:
                 output.extend([text, ""])

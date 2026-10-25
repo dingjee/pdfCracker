@@ -8,6 +8,7 @@ from pathlib import Path
 import pypdfium2 as pdfium
 
 from pdfcracker.diagnostics import probe_styles
+from pdfcracker.delivery import package_markdown
 from pdfcracker.audit import audit_document
 from pdfcracker.extract import extract_document, parse_page_spec
 from pdfcracker.markdown import render_markdown
@@ -79,6 +80,13 @@ def _build_parser() -> argparse.ArgumentParser:
     style_parser.add_argument("pdf", type=Path)
     style_parser.add_argument("--pages", required=True)
     style_parser.add_argument("--output", type=Path, required=True)
+
+    package_parser = subparsers.add_parser("package", help="Package accepted Markdown and its images")
+    package_parser.add_argument("markdown", nargs="+", type=Path)
+    package_parser.add_argument("--artifact-root", type=Path, required=True)
+    package_parser.add_argument("--output", type=Path, required=True)
+    package_parser.add_argument("--include", action="append", type=Path, default=[])
+    package_parser.add_argument("--self-contained", action="store_true")
     return parser
 
 
@@ -195,6 +203,7 @@ def _run_audit(args: argparse.Namespace) -> int:
         markdown,
         args.artifact_root,
         require_full=args.require_full,
+        markdown_path=args.markdown,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
@@ -248,6 +257,13 @@ def main() -> None:
             raise SystemExit(_run_vision_benchmark(args))
         if args.command == "style-probe":
             raise SystemExit(_run_style_probe(args))
+        if args.command == "package":
+            result = package_markdown(
+                args.markdown, args.artifact_root, args.output,
+                self_contained=args.self_contained, extra_files=args.include,
+            )
+            print(result.model_dump_json(indent=2))
+            raise SystemExit(0)
     except (FileNotFoundError, RuntimeError, ValueError) as error:
         parser.error(str(error))
     raise SystemExit(2)

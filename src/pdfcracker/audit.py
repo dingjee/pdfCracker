@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from collections import Counter
 from pathlib import Path
@@ -8,6 +9,13 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from pdfcracker.markdown import render_inline
+from pdfcracker.markdown_content import (
+    image_references,
+    list_item_text,
+    normalize_plain_text,
+    normalized_markdown_text,
+    resolve_image,
+)
 from pdfcracker.models import BlockType, Document
 
 
@@ -132,8 +140,10 @@ def audit_document(
     artifact_root: Path,
     *,
     require_full: bool = False,
+    markdown_path: Path | None = None,
 ) -> AuditReport:
     issues: list[AuditIssue] = []
+    delivered_text = normalized_markdown_text(markdown)
     page_numbers = [page.number for page in document.pages]
     selected = document.selected_pages
     if len(page_numbers) != len(set(page_numbers)):
@@ -192,6 +202,22 @@ def audit_document(
                     object_id=block.id,
                 )
             else:
+                expected = (
+                    [normalized_markdown_text(line.toc_title) for line in block.lines if line.toc_title]
+                    if block.type == BlockType.TOC_ENTRY
+                    else [normalized_markdown_text(
+                        list_item_text(rendered) if block.type == BlockType.LIST_ITEM else rendered
+                    )]
+                )
+                missing = [text for text in expected if text and text not in delivered_text]
+                if missing:
+                    ledger["unexplained"] += 1
+                    _add(
+                        issues, "fatal", "missing_rendered_text",
+                        "An active source block is absent from the delivered Markdown.",
+                        page=page.number, object_id=block.id, evidence=missing,
+                    )
+                    continue
                 ledger[f"emitted:{block.type.value}"] += 1
             if block.confidence < 0.65:
                 _add(
@@ -224,7 +250,13 @@ def audit_document(
                 evidence=decision.reasons,
             )
 
-    referenced_assets = set(re.findall(r"!\[[^\]]*]\(([^)]+)\)", markdown))
+    delivered_path = markdown_path or artifact_root / "book.md"
+    referenced_assets: set[Path] = set()
+    for reference in image_references(markdown):
+        try:
+            referenced_assets.add(resolve_image(delivered_path, artifact_root, reference.source))
+        except ValueError as error:
+            _add(issues, "fatal", "invalid_markdown_image", str(error))
     for image in document.images:
         asset = _safe_asset(artifact_root, image.asset_path)
         if asset is None:
@@ -245,7 +277,13 @@ def audit_document(
                 page=image.page,
                 object_id=image.id,
             )
-        if image.include_in_markdown and image.asset_path not in referenced_assets:
+        elif hashlib.sha256(asset.read_bytes()).hexdigest() != image.sha256:
+            _add(
+                issues, "fatal", "embedded_image_hash_mismatch",
+                "Saved image bytes differ from the extraction manifest.",
+                page=image.page, object_id=image.id,
+            )
+        if image.include_in_markdown and asset not in referenced_assets:
             _add(
                 issues,
                 "fatal",
@@ -293,6 +331,16 @@ def audit_document(
         )
 
     for table in document.tables:
+        if table.include_in_markdown:
+            for row in table.rows:
+                for cell in row:
+                    expected = normalize_plain_text(cell)
+                    if expected and expected not in delivered_text:
+                        _add(
+                            issues, "fatal", "missing_rendered_table_cell",
+                            "A materialized table cell is absent from delivered Markdown.",
+                            page=table.page, object_id=table.id, evidence=[cell],
+                        )
         if table.role == "review":
             _add(
                 issues,
