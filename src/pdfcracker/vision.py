@@ -158,7 +158,7 @@ def call_page_audit(image_path: Path, model: str, timeout_seconds: float = 120) 
         headers={
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/local/pdfcracker",
+            "HTTP-Referer": "https://github.com/dingjee/pdfCracker",
             "X-Title": "PDFCracker visual benchmark",
         },
         json=payload,

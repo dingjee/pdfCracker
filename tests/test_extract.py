@@ -11,7 +11,7 @@ from pdfcracker.models import BlockType
 
 
 SAMPLE_NAME = "Breaking Comedy's DNA_v1.4.4-[US]Jerry Corley.pdf"
-SAMPLE_ROOT = Path(__file__).parents[1] / "puzzle"
+SAMPLE_ROOT = Path(__file__).parents[1] / "inputs"
 SAMPLE_PDF = next(
     (path for path in (SAMPLE_ROOT / SAMPLE_NAME, SAMPLE_ROOT / "achieved" / SAMPLE_NAME)
      if path.is_file()),

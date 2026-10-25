@@ -17,9 +17,9 @@ def test_image_parser_includes_empty_and_reference_links_but_ignores_code() -> N
 
 
 def test_text_normalization_preserves_nested_semantics_and_table_text() -> None:
-    text = '## 标题\n\n<strong><em><u>正文</u></em></strong>\n\n| 列 |\n| --- |\n| A&#124;B |'
-    assert normalized_markdown_text(text) == "标题正文列A|B"
-    assert normalized_markdown_text('![正文](image.png)') == ""
+    text = '## Title\n\n<strong><em><u>Body</u></em></strong>\n\n| Column |\n| --- |\n| A&#124;B |'
+    assert normalized_markdown_text(text) == "TitleBodyColumnA|B"
+    assert normalized_markdown_text('![alt text](image.png)') == ""
 
 
 def test_image_resolution_is_relative_to_markdown_not_artifact_root(tmp_path) -> None:

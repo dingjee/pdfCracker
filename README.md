@@ -1,117 +1,116 @@
 # PDFCracker
 
-PDFCracker is an adaptive, code-first PDF-to-Markdown workflow. It preserves
-page/block/span provenance, classifies layout before using vision, and produces
-a bounded pilot for human review before full-book processing.
+An adaptive, code-first PDF-to-Markdown workflow built as a **meta-tool**: instead of
+hard-coding one parsing strategy, it helps an AI agent fingerprint each new PDF, calibrate
+a document-specific extraction profile, and gate full-book processing behind human review —
+on top of a reusable, fully tested engine.
+
+## Why not just use a parser or a skill?
+
+- **Versus a pure parsing algorithm/library** (pdftext, Marker, Docling, pymupdf4llm):
+  those apply fixed strategies to whatever PDF they receive. PDFCracker wraps them with
+  document adaptation — layout clustering, per-document thresholds, confidence scoring —
+  and adds what converters lack: complete provenance, reversible deletions, cross-page
+  merge decisions with recorded reasons, and an audited intermediate (`document.json`)
+  from which Markdown is only one rendering.
+- **Versus an LLM skill or prompt-driven conversion**: a skill tells a model to improvise;
+  output varies run to run and cannot be verified. PDFCracker encodes the decisions as
+  deterministic, regression-tested code. Vision models are called only for unresolved
+  ambiguity (low confidence, parser disagreement), return short structured JSON, and are
+  logged with cost and latency. The same input yields the same output.
+- **The method in one line**: extract everything deterministically from PDF objects
+  (geometry, fonts, colors, vector lines), measure confidence on every decision, escalate
+  the smallest possible ambiguous region to a vision model, and never publish without an
+  audit pass and a human-reviewed pilot.
+
+## Install
+
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/):
+
+```bash
+git clone https://github.com/dingjee/pdfCracker.git
+cd pdfCracker
+uv sync --locked
+```
+
+Set `OPENROUTER_API_KEY` in a local `.env` (copy `.env.example`) only if you use the
+`vision-benchmark` command. Everything else runs offline.
+
+## Usage
+
+Put source PDFs under `inputs/` (never committed). Extract a pilot — page numbers are
+1-based:
+
+```bash
+uv run pdfcracker extract "inputs/book.pdf" --pages 3-20 --output "runs/book/pilot"
+```
+
+Or run the full staged workflow on a bounded slice; `process` writes to a hidden staging
+directory, extracts embedded image objects, builds a risk-page plan, runs a graded audit,
+and promotes the result only when no integrity error is present:
+
+```bash
+uv run pdfcracker process "inputs/book.pdf" --pages 3-20,37-38 \
+  --output "runs/book/pilot-v2" --keep-review-renders
+```
+
+Omit `--pages` for full-document coverage (guarded by the audit gate). Other commands:
+
+| Command | Purpose |
+|---|---|
+| `render` | Render selected pages to PNG for visual QA (default 96 DPI) |
+| `style-probe` | Inspect native fonts, colors, vector lines, duplicate glyphs — no vision |
+| `audit` | Re-audit a `document.json` + Markdown pair against its artifacts |
+| `package` | Bundle accepted Markdown + images into a verified ZIP / self-contained HTML |
+| `vision-benchmark` | Score vision providers against gold data via OpenRouter |
+
+Apply reviewed, document-specific decisions with `--profile` (kept out of the reusable
+core). Re-run audits with `--require-full`; only fundamental integrity failures block
+publication, ordinary fidelity uncertainty is reported for targeted review.
+
+## What the pipeline guarantees
+
+- Page/block/span provenance for every deletion, style transformation, paragraph join,
+  and cross-page merge.
+- Inline semantics as orthogonal flags (bold, italic, underline, semantic color) — never
+  flattened; Markdown stays readable, exact presentation is deferred to later EPUB CSS.
+- Embedded image objects only; no page rasterization fallback. Decoration/ambiguity is
+  flagged for review, not silently inserted.
+- Audits that check delivered Markdown content, table cells, image references, and asset
+  hashes — not just the intermediate.
+- OCR and vision are escalations, never the default for a healthy text layer.
+
+See [RESEARCH_AND_TEST_PLAN.md](RESEARCH_AND_TEST_PLAN.md) for the full architecture,
+benchmarks, and phased plan, and [knowledge/](knowledge/) for promoted extraction rules.
+
+## Repository layout
+
+```
+src/pdfcracker/      reusable engine (extraction, styles, audit, delivery, vision)
+tests/               unit tests + golden tests (skip without a local regression PDF)
+knowledge/           promoted, evidence-backed rules and workflow lessons
+research/            one-off study scripts; generated evidence stays ignored
+inputs/              your source PDFs (ignored — never enter version control)
+runs/<document-id>/  per-document profiles, pilots, outputs (ignored)
+```
 
 ## Development
 
-```powershell
-uv sync --locked
+```bash
 uv run python -m pytest
 uv run python -m ruff check .
 ```
 
-## Repository boundary
+Golden tests look for their named regression PDF under `inputs/` and skip cleanly when it
+is absent, so cloning this repo runs the full suite with no proprietary files.
 
-This repository contains only reusable engineering assets: source code, tests,
-configuration templates, scripts, and documentation. Local source documents
-belong in `puzzle/`; per-document intermediates and final outputs belong in
-`runs/`. Generated benchmark data, screenshots, and document-derived gold data
-stay under their ignored `research/` directories. None of these inputs or
-outputs are versioned.
+## Security notes
 
-Copy `.env.example` to `.env` for local API credentials. Tests that require a
-local regression PDF are skipped when `puzzle/` is absent.
+- Source PDFs, extracted content, and generated evidence are never committed.
+- API credentials live only in a local `.env`; code reads them from the environment.
+- Image references are validated against path escapes; packaged archives are CRC- and
+  link-verified before publication.
 
-Extract a pilot (page numbers are 1-based):
+## License
 
-```powershell
-uv run pdfcracker extract "puzzle/book.pdf" --pages 3-20 --output "runs/book/pilot"
-```
-
-Render diagnostic pages:
-
-```powershell
-uv run pdfcracker render "puzzle/book.pdf" --pages 3,15,37-38 --dpi 96 --output "runs/book/qa"
-```
-
-Inspect native style evidence without vision:
-
-```powershell
-uv run pdfcracker style-probe "puzzle/book.pdf" --pages 3,15 --output "runs/book/qa/styles.json"
-```
-
-Run the staged workflow on a bounded pilot:
-
-```powershell
-uv run pdfcracker process "puzzle/book.pdf" `
-  --pages 3-20,37-38 `
-  --output "runs/book/pilot-v2" `
-  --keep-review-renders
-```
-
-Apply reviewed, document-specific decisions without promoting them into the
-reusable core:
-
-```powershell
-uv run pdfcracker process "puzzle/book.pdf" `
-  --output "runs/book/full-v2" `
-  --profile "runs/book/profile-v1.json"
-```
-
-Use `--keep-cache` during iterative calibration when another run is expected.
-Final successful runs clean the content-addressed cache by default.
-
-Omit `--pages` for full-document coverage. `process` writes to a hidden staging
-directory, extracts embedded PDF image objects, builds a risk-page plan, runs the
-graded audit, and promotes the result only when no fundamental integrity error is
-present. Successful runs remove their content-addressed raw-parser cache.
-
-The current image scope is deliberately narrow: PDFCracker extracts only embedded
-image objects. It does not rasterize whole pages or arbitrary regions as a fallback.
-Every decoded object is retained in the manifest; only evidence-backed content images
-are inserted into Markdown. Decorations and ambiguous objects remain auditable.
-
-Re-run an audit from saved artifacts:
-
-```powershell
-uv run pdfcracker audit "runs/book/full/document.json" `
-  "runs/book/full/book.md" `
-  --artifact-root "runs/book/full" `
-  --output "runs/book/full/qa/audit.json" `
-  --require-full
-```
-
-Audit levels are `fatal`, `needs_review`, `warning`, and `information`. Only
-fundamental integrity failures block publication; ordinary fidelity uncertainty is
-reported for targeted review.
-
-Package accepted Markdown with its image files (no `document.json` required):
-
-```powershell
-uv run pdfcracker package "runs/book/full/book.md" `
-  --artifact-root "runs/book/full" `
-  --output "runs/book/delivery" `
-  --self-contained
-```
-
-The ZIP preserves paths relative to `--artifact-root`, so Markdown in a nested
-directory can still reference sibling assets. It includes a browser reading
-version of the first Markdown input. `--self-contained` also writes one HTML
-file with original image bytes embedded. Multiple Markdown inputs and repeated
-`--include path/to/file.txt` options can share one package. The output directory
-must be new. All references, image decoding, archive CRC, and embedded image hashes
-are checked before the delivery directory is published. Images must be local,
-inside the declared root, and browser compatible for HTML delivery.
-
-Audits check the delivered Markdown, including body text, materialized table
-cells, empty/missing image destinations, and asset hashes. CLI image references
-resolve from the supplied Markdown file's directory rather than the sidecar's
-directory. These checks detect missing content; they do not prove reading order
-or cross-page merge precision.
-
-See [extraction and delivery lessons](knowledge/workflows/native-extraction-and-delivery.md)
-for the acceptance method, common false passes, and retention policy. Local golden
-tests select their named regression PDF in `puzzle/` or `puzzle/achieved/`; adding
-another PDF must not silently change the regression source.
+[MIT](LICENSE)
