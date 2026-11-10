@@ -69,5 +69,19 @@ transcribing the printed table of contents (PDF pages 11-15) into
 `toc-printed.json` and rebuilding the navigation from it (125 links);
 `pdfcracker.epub_nav` now carries the reusable implementation. Two OCR-
 truncated two-line headings (7.3, 8.3) were restored against the independent
-line cache and the printed TOC. Lesson recorded in the workflow doc: the
-navigation must mirror the printed TOC, never the converter's heading list.
+line cache and the printed TOC.
+
+The user then reported that bookmarks were still messy: their reader derives
+the outline from the body headings, not from the navigation document, and the
+body still carried all 180 headings. The body outline was aligned with the
+printed TOC as well — headings outside it were demoted to bold labels during
+assembly (32 demotions, each recorded as a transformation), including the
+assembler's own synthesized note-section heads and the pilot chapter's. One
+OCR "heading" turned out to be a sentence fragment cut in two
+("电影史上文本变体的最让人头疼 | 的一个例子要数1903年…", PDF page 57) and was
+repaired by joining it back to its paragraph. Result: 128 body headings, all
+of them printed-TOC entries, and 125 navigation links.
+
+Lesson recorded in the workflow doc: the navigation document *and* the body
+heading structure must both mirror the printed TOC — fixing one does not fix
+readers that use the other.

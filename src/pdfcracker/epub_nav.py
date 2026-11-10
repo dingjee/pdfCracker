@@ -28,6 +28,25 @@ ENUM_PREFIX_RE = re.compile(r"^\s*(?:第[一二三四五六七八九十百零]+[
 _TITLE_PUNCT_RE = re.compile(r"[\s“”\"'‘’()（）:：,，、.·\-—?？!！;；]")
 
 
+def outline_title_variants(toc_data: dict[str, Any]) -> list[str]:
+    """Normalized title variants of every printed-TOC entry.
+
+    Each entry contributes its title, its ``match`` alias and the enumeration
+    prefix removed (``第一章 标题`` / ``1. 标题``), so a body heading matches
+    the printed entry even when the prefix is missing or differs.  Used both
+    for anchor matching and for deciding which body headings belong to the
+    printed outline.
+    """
+    variants: set[str] = set()
+    for entry in load_toc(toc_data):
+        for base in {entry.title, entry.match or entry.title}:
+            for candidate in {base, ENUM_PREFIX_RE.sub("", base).strip()}:
+                value = normalize_title(candidate)
+                if value:
+                    variants.add(value)
+    return sorted(variants)
+
+
 def _qn(namespace: str, tag: str) -> str:
     return f"{{{namespace}}}{tag}"
 

@@ -114,6 +114,21 @@ def read_nav_toc(path: Path):
     return rows
 
 
+def test_outline_title_variants_cover_prefix_stripping_and_aliases() -> None:
+    from pdfcracker.epub_nav import outline_title_variants
+
+    variants = set(outline_title_variants({
+        "entries": [
+            {"level": 1, "title": "第一章　试验"},
+            {"level": 2, "title": "4.20 结论", "match": "4.20 结语"},
+        ]
+    }))
+    assert "第一章试验" in variants
+    assert "试验" in variants
+    assert "420结论" in variants
+    assert "420结语" in variants
+
+
 def test_normalize_title_ignores_width_spacing_and_punctuation() -> None:
     assert normalize_title("第一章　试验") == normalize_title("第一章 试验")
     assert normalize_title("1.1 第一节") == "11第一节"

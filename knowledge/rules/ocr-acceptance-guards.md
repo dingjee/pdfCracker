@@ -17,6 +17,14 @@ An OCR "heading" role on a boxed insert (table title, group labels such as 基�
 - Keep the box title as one heading if it is visually prominent in print.
 - Fold group labels into bold lead-ins of their content blocks (drop the label blocks with reversible tombstones, text preserved verbatim) so they do not pollute navigation.
 
+## Keep the body outline equal to the printed table of contents
+
+Readings apps differ in where they take the table of contents from: some read the EPUB navigation document, others derive an outline from the body headings. Cleaning only the navigation document leaves those readers with the full heading mess (note sections, ordinal fragments, running labels, kept-duplicate title lines).
+
+- Treat the printed table of contents as the single source of truth for the outline: numbered sections and the unnumbered sub-entries it lists stay headings; everything else (note-section heads, inset-box labels, running labels, ordinal fragments, duplicate title lines, sentence fragments misread as headings) is demoted to a bold label — words preserved, outline level removed.
+- Demotion must be recorded as a transformation with evidence, and it applies to synthesized heads too (the note-section label the assembler adds at each section end, and the pilot chapter's own heads).
+- An OCR heading that is really a fragment of one sentence must be repaired, not demoted: join it back to the paragraph it was cut from (evidence: the independent line cache places the line between body lines, not in a heading position).
+
 ## Unmarked first-page notes break seams
 
 Journals and article collections reprint articles with asterisk author notes (`* 本文为…`) at the first page's bottom. OCR often misclassifies them as list items (a `- ` item) or plain body text. Left in place, the note sits between a paragraph and its continuation, and every cross-page seam over it fails validation (or worse, merges around it silently).

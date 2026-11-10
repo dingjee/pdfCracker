@@ -47,6 +47,11 @@ Copy the pattern, not the page numbers.
    to their own chapter; any unmatched entry aborts the build. Note sections,
    inset-box labels, running labels and sentence fragments stay in the body
    but never become navigation entries.
+   The body outline must mirror the same list: readers that derive bookmarks
+   from the body headings see every heading, so headings outside the printed
+   TOC (note-section heads, inset labels, running labels, ordinal fragments,
+   duplicate title lines) are demoted to bold labels during assembly, with
+   the demotion recorded as a transformation.
 8. **Independent audit** (`pdfcracker.epub_audit.verify`): chapter prose
    round-trip, footnote reference↔definition↔back-link round-trips, image
    alt/resource equality, and every navigation target resolved.
