@@ -194,6 +194,62 @@ def build_toc_list(matched: list[tuple[TocEntry, HeadingAnchor]], nav_dir: str) 
     return root_ol
 
 
+def set_document_titles(epub_path, log: dict | None = None) -> dict[str, str]:
+    """Give every content document a meaningful ``<title>``.
+
+    Converters that split a book by chapter leave the file name as the
+    document title (``ch010.xhtml``).  Readers that label their table of
+    contents or bookmarks from the document title then show those names --
+    often reduced to bare numbers.  The title is taken from the document's
+    first heading; documents without one keep their file name.
+    """
+    from pathlib import Path
+
+    ET.register_namespace("", XHTML_NS)
+    ET.register_namespace("epub", OPS_NS)
+    path = Path(epub_path)
+    titles: dict[str, str] = {}
+    with ZipFile(path) as z:
+        container = ET.fromstring(z.read("META-INF/container.xml"))
+        opf_name = next(node.get("full-path") for node in container.iter() if node.get("full-path"))
+        opf = ET.fromstring(z.read(opf_name))
+        manifest = {item.get("id"): item
+                    for item in opf.findall(f"{_qn(OPF_NS, 'manifest')}/{_qn(OPF_NS, 'item')}")}
+        spine_ids = [ref.get("idref") for ref in opf.findall(f"{_qn(OPF_NS, 'spine')}/{_qn(OPF_NS, 'itemref')}")]
+        documents = [
+            (item_id, _target(opf_name, manifest[item_id].get("href")))
+            for item_id in spine_ids
+            if item_id in manifest and manifest[item_id].get("href", "").endswith(".xhtml")
+        ]
+        payload: dict[str, bytes] = {}
+        for _item_id, name in documents:
+            root = ET.fromstring(z.read(name))
+            heading = next((element for element in root.iter()
+                            if element.tag in {_qn(XHTML_NS, "h1"), _qn(XHTML_NS, "h2")}), None)
+            if heading is None:
+                continue
+            title = "".join(heading.itertext()).strip()
+            head = root.find(_qn(XHTML_NS, "head"))
+            if head is None or not title:
+                continue
+            title_element = head.find(_qn(XHTML_NS, "title"))
+            if title_element is None:
+                title_element = ET.SubElement(head, _qn(XHTML_NS, "title"))
+            title_element.text = title
+            titles[name] = title
+            payload[name] = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+    if payload:
+        tmp = path.with_suffix(".titletmp")
+        with ZipFile(path) as zin, ZipFile(tmp, "w", ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                zout.writestr(item, payload.get(item.filename) or zin.read(item.filename))
+        tmp.replace(path)
+    if log is not None:
+        log["document_titles"] = titles
+    return titles
+
+
 def rewrite_epub_nav(epub_path, toc_data: dict[str, Any], log: dict | None = None) -> int:
     """Replace the navigation TOC of the EPUB at ``epub_path`` in place.
 

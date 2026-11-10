@@ -24,6 +24,12 @@ Readings apps differ in where they take the table of contents from: some read th
 - Treat the printed table of contents as the single source of truth for the outline: numbered sections and the unnumbered sub-entries it lists stay headings; everything else (note-section heads, inset-box labels, running labels, ordinal fragments, duplicate title lines, sentence fragments misread as headings) is demoted to a bold label — words preserved, outline level removed.
 - Demotion must be recorded as a transformation with evidence, and it applies to synthesized heads too (the note-section label the assembler adds at each section end, and the pilot chapter's own heads).
 - An OCR heading that is really a fragment of one sentence must be repaired, not demoted: join it back to the paragraph it was cut from (evidence: the independent line cache places the line between body lines, not in a heading position).
+- A heading that repeats another section's title (a table-of-contents listing
+  line promoted to a heading) is a label, not a section: demote it, so the
+  title appears once, on the section it names.
+- Give every content document its own `<title>`. Converters that split by
+  chapter leave the file name in place, and readers that label their entries
+  from the document title then show bare numbers instead of chapter names.
 
 ## Unmarked first-page notes break seams
 

@@ -34,6 +34,7 @@ OPF = """<?xml version="1.0" encoding="utf-8"?>
 
 CHAPTER_1 = """<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>ch001.xhtml</title></head>
 <body>
 <section id="第一章-试验" class="level1"><h1>第一章　试验</h1>
 <p>正文。</p>
@@ -49,6 +50,7 @@ CHAPTER_1 = """<?xml version="1.0" encoding="utf-8"?>
 # a bare heading without a wrapping section id exercises the fallback
 CHAPTER_2 = """<?xml version="1.0" encoding="utf-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>ch002.xhtml</title></head>
 <body>
 <h1 id="第二章-续篇">第二章　续篇</h1>
 <section id="结论" class="level2"><h2>结论</h2><p>末段。</p></section>
@@ -112,6 +114,22 @@ def read_nav_toc(path: Path):
         if child.tag == XHTML + "ol":
             walk(child, 0)
     return rows
+
+
+def test_set_document_titles_replaces_file_names(tmp_path) -> None:
+    from pdfcracker.epub_nav import set_document_titles
+
+    epub = tmp_path / "book.epub"
+    build_epub(epub)
+    log: dict = {}
+    titles = set_document_titles(epub, log)
+    assert titles["EPUB/text/ch001.xhtml"] == "第一章　试验"
+    assert titles["EPUB/text/ch002.xhtml"] == "第二章　续篇"
+    with zipfile.ZipFile(epub) as z:
+        first = z.read("EPUB/text/ch001.xhtml").decode("utf-8")
+        assert "<title>第一章　试验</title>" in first
+        # the rest of the document is untouched
+        assert "<h1>第一章　试验</h1>" in first
 
 
 def test_outline_title_variants_cover_prefix_stripping_and_aliases() -> None:

@@ -52,6 +52,10 @@ Copy the pattern, not the page numbers.
    TOC (note-section heads, inset labels, running labels, ordinal fragments,
    duplicate title lines) are demoted to bold labels during assembly, with
    the demotion recorded as a transformation.
+   Every content document must also carry its own `<title>`. A converter that
+   splits the book by chapter leaves the file name there (`ch010.xhtml`), and
+   readers that label entries from the document title then show bare numbers
+   instead of chapter names (`pdfcracker.epub_nav.set_document_titles`).
 8. **Independent audit** (`pdfcracker.epub_audit.verify`): chapter prose
    round-trip, footnote reference↔definition↔back-link round-trips, image
    alt/resource equality, and every navigation target resolved.
