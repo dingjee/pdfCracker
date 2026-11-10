@@ -20,6 +20,7 @@ classifiers = [
 dependencies = [
     "httpx>=0.28.1",
     "markdown-it-py==3.0.0",
+    "numpy>=2.5.1",
     "pdfplumber>=0.11.10",
     "pdftext>=0.7.1",
     "pillow>=12.3.0",
@@ -37,6 +38,10 @@ diagnostics = []
 [build-system]
 requires = ["uv_build>=0.11.26,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.ruff]
+# Vendored pinned runtimes (scripts/setup_xiaomi_ocr.py) are third-party code.
+exclude = [".local"]
 
 [dependency-groups]
 dev = [

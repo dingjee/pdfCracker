@@ -91,6 +91,7 @@ Relevant changes must be verified at the smallest sufficient scope and then agai
 Quality gates include:
 
 - zero known body-text deletions;
+- OCR text screened for raw-markup artifacts before assembly (pseudo-HTML tags are corrected against evidence, never bulk-deleted);
 - cross-page merge precision at or above the documented target;
 - correct reading order and paragraph boundaries on the gold set;
 - no unresolved high-severity visual issues;

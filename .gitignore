@@ -16,7 +16,11 @@ build/
 dist/
 *.egg-info/
 
+# Pinned local runtimes and models (installed by scripts/, never edited or committed)
+.local/
+
 # Local document inputs. Source documents never enter version control.
+input/
 inputs/
 *.pdf
 
@@ -33,3 +37,4 @@ tmp/
 research/benchmarks/
 research/evidence/
 research/gold/
+.DS_Store

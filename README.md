@@ -68,6 +68,18 @@ Apply reviewed, document-specific decisions with `--profile` (kept out of the re
 core). Re-run audits with `--require-full`; only fundamental integrity failures block
 publication, ordinary fidelity uncertainty is reported for targeted review.
 
+## Full scanned books: local OCR to verified EPUB
+
+For scanned sources with no usable text layer, the same gate-first method scales to a
+whole book: background local OCR with resume, an independent line-cache coverage review,
+an OCR markup-artifact screen, evidence-reviewed paragraph joins (chain-aware across
+blocks, figures and pages), staged assembly with reversible tombstones, and an EPUB
+packaging step that publishes only after EPUBCheck reports 0 errors and 0 warnings and an
+independent audit round-trips chapter prose, footnotes, images and navigation against the
+Markdown source. See [knowledge/workflows/full-scanned-book-to-epub.md](knowledge/workflows/full-scanned-book-to-epub.md)
+and the modules `joins`, `line_geometry`, `ocr_artifacts`, `coverage_review` and
+`epub_audit`.
+
 ## What the pipeline guarantees
 
 - Page/block/span provenance for every deletion, style transformation, paragraph join,
