@@ -40,6 +40,13 @@ Copy the pattern, not the page numbers.
    EPUBCheck (project-local jar) must report 0 errors AND 0 warnings;
    alt text, media mapping and chapter splitting are verified against the
    markdown. Packaging must refuse to overwrite existing outputs.
+   The navigation must mirror the printed table of contents, not the
+   converter's heading list: transcribe the printed TOC with levels, and
+   rebuild the navigation list from it (`pdfcracker.epub_nav`), linking each
+   entry to its body heading with an order cursor so repeated titles resolve
+   to their own chapter; any unmatched entry aborts the build. Note sections,
+   inset-box labels, running labels and sentence fragments stay in the body
+   but never become navigation entries.
 8. **Independent audit** (`pdfcracker.epub_audit.verify`): chapter prose
    round-trip, footnote reference↔definition↔back-link round-trips, image
    alt/resource equality, and every navigation target resolved.
@@ -71,6 +78,7 @@ Copy the pattern, not the page numbers.
 | `pdfcracker.ocr_artifacts` | raw-markup screen for OCR text |
 | `pdfcracker.coverage_review` | independent line-cache cross-check |
 | `pdfcracker.epub_audit` | unlinked-note preservation; independent EPUB audit |
+| `pdfcracker.epub_nav` | rebuild the navigation TOC from the printed table of contents |
 
 The run-specific pieces that stay per-document: profile (sections, page
 overrides, corrections, blank-page evidence), figure manifest and crops,

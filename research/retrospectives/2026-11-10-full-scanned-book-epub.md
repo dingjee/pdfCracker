@@ -55,4 +55,19 @@ file passed every gate.
   backlink and altered text raise; unlinked notes become visible markers.
 - `tests/test_line_geometry.py` — ink-line detection; seam supported,
   indented and short-line refusals.
+- `tests/test_epub_nav.py` — printed-TOC matching with an order cursor over
+  repeated titles, enumeration-prefix fallback, match aliases for TOC/body
+  drift, unmatched-entry failure, nested list rebuild.
 - Run-local frozen suites (41 tests) remain in the run directory.
+
+## 2026-11-10 follow-up: navigation pollution
+
+The delivered EPUB's first navigation (180 links) listed every level-2
+heading, including 18 note sections, inset-box labels, a running label
+(Chapter 10), ordinal fragments and duplicate title fragments. Fixed by
+transcribing the printed table of contents (PDF pages 11-15) into
+`toc-printed.json` and rebuilding the navigation from it (125 links);
+`pdfcracker.epub_nav` now carries the reusable implementation. Two OCR-
+truncated two-line headings (7.3, 8.3) were restored against the independent
+line cache and the printed TOC. Lesson recorded in the workflow doc: the
+navigation must mirror the printed TOC, never the converter's heading list.
