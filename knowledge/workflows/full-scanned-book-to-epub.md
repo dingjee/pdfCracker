@@ -35,7 +35,16 @@ Copy the pattern, not the page numbers.
    joins), collect footnote definitions per section, and emit `document.json`
    (full provenance), `book.md`, and images. Assembly QA must pass with zero
    failures; `needs_review` items are recorded, not ignored.
-7. **EPUB packaging with hard gates.** Convert unlinked note definitions to
+7. **Post-assembly paragraph reflow.** Join review misses seams whose
+   evidence is ambiguous in text (wraps at sentence-final periods,
+   text beside figures). Reflow the assembled Markdown against
+   line-level OCR geometry: a block is a continuation iff its first
+   print line is flush at its column edge and the previous block's
+   last print line still reaches the right edge. Never delete text;
+   assert the non-space character count; log every decision with
+   evidence; freeze display pages and guard notes/lists
+   (`knowledge/rules/paragraph-reflow-geometry.md`, `pdfcracker.reflow`).
+8. **EPUB packaging with hard gates.** Convert unlinked note definitions to
    visible inline markers, then package with a pinned converter:
    EPUBCheck (project-local jar) must report 0 errors AND 0 warnings;
    alt text, media mapping and chapter splitting are verified against the
@@ -56,6 +65,13 @@ Copy the pattern, not the page numbers.
    splits the book by chapter leaves the file name there (`ch010.xhtml`), and
    readers that label entries from the document title then show bare numbers
    instead of chapter names (`pdfcracker.epub_nav.set_document_titles`).
+    A self-contained packager carries the same hard gates plus an EPUBCheck
+    *inside* the build: grayscale-JPEG media conversion at original pixel
+    size, per-chapter footnote renumbering (ids are per chapter file —
+    resolve per file first; insert `doc-backlink` anchors for every
+    `doc-noteref`, including cross-XHTML hrefs), byte-equality media
+    mapping (the converter renames images to `media/fileN.jpg`), and an
+    atomic publish (`pdfcracker.epub_build`).
 8. **Independent audit** (`pdfcracker.epub_audit.verify`): chapter prose
    round-trip, footnote reference↔definition↔back-link round-trips, image
    alt/resource equality, and every navigation target resolved.
@@ -84,6 +100,8 @@ Copy the pattern, not the page numbers.
 |---|---|
 | `pdfcracker.joins` | sentence-end detection; reviewed join application with chain redirects |
 | `pdfcracker.line_geometry` | ink-line measurement; seam fill/indent support |
+| `pdfcracker.reflow` | post-assembly paragraph reflow from line-OCR geometry (flush/reach, wrap columns, note zones) |
+| `pdfcracker.epub_build` | self-contained EPUB3 packaging with EPUBCheck inside the build, footnote back-links, media mapping, atomic publish |
 | `pdfcracker.ocr_artifacts` | raw-markup screen for OCR text |
 | `pdfcracker.coverage_review` | independent line-cache cross-check |
 | `pdfcracker.epub_audit` | unlinked-note preservation; independent EPUB audit |
